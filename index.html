@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบันทึกรายรับ-รายจ่าย</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-100 p-5">
+
+    <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md">
+        <h1 class="text-2xl font-bold mb-6 text-center text-blue-600">บันทึกรายรับ-รายจ่าย</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <input type="text" id="desc" placeholder="รายการ (เช่น ค่าข้าว)" class="border p-2 rounded">
+            <input type="number" id="amount" placeholder="จำนวนเงิน" class="border p-2 rounded">
+            <select id="type" class="border p-2 rounded">
+                <option value="income">รายรับ</option>
+                <option value="expense">รายจ่าย</option>
+            </select>
+            <button onclick="addData()" class="md:col-span-3 bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition">เพิ่มรายการ</button>
+        </div>
+
+        <div class="flex justify-between mb-6 p-4 bg-gray-50 rounded-lg">
+            <div class="text-green-600 font-bold">รายรับ: <span id="totalIncome">0</span></div>
+            <div class="text-red-600 font-bold">รายจ่าย: <span id="totalExpense">0</span></div>
+            <div class="text-blue-700 font-bold">คงเหลือ: <span id="balance">0</span></div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-200">
+                        <th class="p-2 border">วันที่</th>
+                        <th class="p-2 border">รายการ</th>
+                        <th class="p-2 border">ประเภท</th>
+                        <th class="p-2 border text-right">จำนวนเงิน</th>
+                        <th class="p-2 border text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="mt-6 flex gap-2">
+            <button onclick="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">ส่งออกเป็น Excel</button>
+            <button onclick="clearData()" class="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500">ล้างข้อมูลทั้งหมด</button>
+        </div>
+    </div>
+
+    <script>
+        let transactions = JSON.parse(localStorage.getItem('my_wallet')) || [];
+
+        function addData() {
+            const desc = document.getElementById('desc').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const type = document.getElementById('type').value;
+
+            if (!desc || isNaN(amount)) return alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+
+            const item = {
+                date: new Date().toLocaleDateString('th-TH'),
+                desc,
+                type: type === 'income' ? 'รายรับ' : 'รายจ่าย',
+                amount: type === 'income' ? amount : -amount
+            };
+
+            transactions.push(item);
+            saveAndRender();
+            
+            document.getElementById('desc').value = '';
+            document.getElementById('amount').value = '';
+        }
+
+        function saveAndRender() {
+            localStorage.setItem('my_wallet', JSON.stringify(transactions));
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            let inc = 0;
+            let exp = 0;
+
+            transactions.forEach((t, index) => {
+                const row = `<tr>
+                    <td class="p-2 border">${t.date}</td>
+                    <td class="p-2 border">${t.desc}</td>
+                    <td class="p-2 border">${t.type}</td>
+                    <td class="p-2 border text-right ${t.amount > 0 ? 'text-green-600' : 'text-red-600'}">${Math.abs(t.amount).toLocaleString()}</td>
+                    <td class="p-2 border text-center">
+                        <button onclick="deleteItem(${index})" class="text-red-500 hover:text-red-700 font-bold">ลบ</button>
+                    </td>
+                </tr>`;
+                tbody.innerHTML += row;
+
+                if (t.amount > 0) inc += t.amount;
+                else exp += Math.abs(t.amount);
+            });
+
+            document.getElementById('totalIncome').innerText = inc.toLocaleString();
+            document.getElementById('totalExpense').innerText = exp.toLocaleString();
+            document.getElementById('balance').innerText = (inc - exp).toLocaleString();
+        }
+
+        // ฟังก์ชันลบรายการรายบุคคล
+        function deleteItem(index) {
+            if(confirm('ยืนยันการลบรายการนี้ใช่หรือไม่?')) {
+                transactions.splice(index, 1);
+                saveAndRender();
+            }
+        }
+
+        function exportToExcel() {
+            if (transactions.length === 0) return alert("ไม่มีข้อมูลให้ส่งออก");
+            const worksheet = XLSX.utils.json_to_sheet(transactions);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "รายรับรายจ่าย");
+            XLSX.writeFile(workbook, "Wallet_Data.xlsx");
+        }
+
+        function clearData() {
+            if (confirm("ยืนยันการลบข้อมูลทั้งหมด?")) {
+                transactions = [];
+                saveAndRender();
+            }
+        }
+
+        renderTable();
+    </script>
+<div style="display: flex; justify-content: center; align-items: center; height: 20vh;">
+    Create by PICH
+</div>
+</body>
+</html>
